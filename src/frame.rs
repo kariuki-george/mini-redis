@@ -37,9 +37,8 @@ impl Frame {
 
                 Ok(())
             }
-            bytes => Err(FrameError::Other(format!(
-                "Protocol Error: Invalid input {:?}",
-                bytes
+            _ => Err(FrameError::Other(String::from(
+                "Protocol Error: Invalid input ",
             ))),
         }
     }
@@ -67,9 +66,8 @@ impl Frame {
 
                 Ok(Frame::Integer(integer))
             }
-            bytes => Err(FrameError::Other(format!(
-                "Protocol Error: Invalid input {:?}",
-                bytes
+            _ => Err(FrameError::Other(String::from(
+                "Protocol Error: Invalid input ",
             ))),
         }
     }

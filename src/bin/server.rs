@@ -1,4 +1,7 @@
-use mini_redis::{connection::Connection, frame::Frame};
+use mini_redis::{
+    connection::{Connection, ConnectionError},
+    frame::{Frame, FrameError},
+};
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -24,10 +27,18 @@ async fn main() {
                             .unwrap(),
                     }
                 }
-                Err(_err) => connection
-                    .write(Frame::String("err".to_string()))
-                    .await
-                    .unwrap(),
+                Err(err) => match err {
+                    ConnectionError::FrameError(err) => match err {
+                        FrameError::Other(err) => {
+                            connection.write(Frame::String(err)).await.unwrap()
+                        }
+                        FrameError::Incomplete => todo!(),
+                    },
+                    ConnectionError::IOError(err) => connection
+                        .write(Frame::String(format!("{}", err)))
+                        .await
+                        .unwrap(),
+                },
             }
         });
 
