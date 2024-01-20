@@ -8,25 +8,29 @@ async fn main() {
     loop {
         let (stream, _) = listener.accept().await.unwrap();
 
-        let mut connection = Connection::new(stream);
-        match connection.read_frame().await {
-            Ok(frame) => {
-                println!("{frame:?}");
-                match frame {
-                    Some(_frame) => connection
-                        .write(Frame::String("output".to_string()))
-                        .await
-                        .unwrap(),
-                    None => connection
-                        .write(Frame::String("none".to_string()))
-                        .await
-                        .unwrap(),
+        let handle = tokio::spawn(async move {
+            let mut connection = Connection::new(stream);
+            match connection.read_frame().await {
+                Ok(frame) => {
+                    println!("{frame:?}");
+                    match frame {
+                        Some(_frame) => connection
+                            .write(Frame::String("output".to_string()))
+                            .await
+                            .unwrap(),
+                        None => connection
+                            .write(Frame::String("none".to_string()))
+                            .await
+                            .unwrap(),
+                    }
                 }
+                Err(_err) => connection
+                    .write(Frame::String("err".to_string()))
+                    .await
+                    .unwrap(),
             }
-            Err(_err) => connection
-                .write(Frame::String("err".to_string()))
-                .await
-                .unwrap(),
-        }
+        });
+
+        handle.await.unwrap();
     }
 }

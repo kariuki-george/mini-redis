@@ -17,7 +17,6 @@ async fn main() {
         }
         Err(e) => println!("{e:?}"),
     }
-    // //thread::sleep(Duration::from_secs(20));
 }
 
 fn handle_frame(frame: Result<Option<Frame>, mini_redis::connection::ConnectionError>) {
