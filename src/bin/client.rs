@@ -1,25 +1,33 @@
-use std::{io::Read, net::TcpStream};
+use mini_redis::{connection::Connection, frame::Frame};
 
-struct Client {
-    connection: TcpStream,
-}
+use tokio::net::TcpStream;
 
-impl Client {
-    fn connect() -> Self {
-        let connection = TcpStream::connect("localhost:6379").unwrap();
-        Client { connection }
-    }
-}
-
-fn main() {
-    let mut client = Client::connect();
-
-    let mut buffer = [0u8; 1024]; // Buffer to hold incoming data
+#[tokio::main]
+async fn main() {
+    let stream = TcpStream::connect("localhost:6379").await.unwrap();
+    let mut client = Connection::new(stream);
 
     // Read data from the stream
-    let bytes_read = client.connection.read(&mut buffer).unwrap();
-    // Process the received data
-    let received_data = String::from_utf8_lossy(&buffer[..bytes_read]);
 
-    println!("Received: {:?}", received_data);
+    match client.write(Frame::String("input".to_string())).await {
+        Ok(_) => {
+            let frame: Result<Option<Frame>, mini_redis::connection::ConnectionError> =
+                client.read_frame().await;
+            handle_frame(frame)
+        }
+        Err(e) => println!("{e:?}"),
+    }
+    // //thread::sleep(Duration::from_secs(20));
+}
+
+fn handle_frame(frame: Result<Option<Frame>, mini_redis::connection::ConnectionError>) {
+    match frame {
+        Ok(opt) => println!("{opt:?}"),
+        Err(e) => match e {
+            mini_redis::connection::ConnectionError::FrameError(_) => println!("{e:?}"),
+            mini_redis::connection::ConnectionError::IOError(e) => {
+                println!("{e:?}")
+            }
+        },
+    }
 }
