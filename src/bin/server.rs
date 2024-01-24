@@ -53,14 +53,11 @@ async fn main() {
 async fn handle_err(connection_error: ConnectionError, connection: &mut Connection) {
     match connection_error {
         ConnectionError::FrameError(err) => match err {
-            FrameError::Other(err) => connection
-                .write_all(Frame::SimpleString(err))
-                .await
-                .unwrap(),
+            FrameError::Other(err) => connection.write_all(Frame::SimpleError(err)).await.unwrap(),
             FrameError::Incomplete => todo!(),
         },
         ConnectionError::IOError(err) => connection
-            .write_all(Frame::SimpleString(format!("{}", err)))
+            .write_all(Frame::SimpleError(format!("{}", err)))
             .await
             .unwrap(),
     }
@@ -68,18 +65,15 @@ async fn handle_err(connection_error: ConnectionError, connection: &mut Connecti
 
 async fn handle_runner_err(runner_error: RunnerError, connection: &mut Connection) {
     match runner_error {
-        RunnerError::Other(err) => connection
-            .write_all(Frame::SimpleString(err))
-            .await
-            .unwrap(),
+        RunnerError::Other(err) => connection.write_all(Frame::SimpleError(err)).await.unwrap(),
         RunnerError::Incomplete => connection
-            .write_all(Frame::SimpleString(
+            .write_all(Frame::SimpleError(
                 "Protocol Error: Incorrect usage of command".to_string(),
             ))
             .await
             .unwrap(),
         RunnerError::Unsupported => connection
-            .write_all(Frame::SimpleString(
+            .write_all(Frame::SimpleError(
                 "Protocol Error: Unsupported usage of command or values".to_string(),
             ))
             .await
