@@ -1,15 +1,15 @@
-use std::io::Cursor;
+use std::{collections::VecDeque, io::Cursor};
 
 use bytes::{Buf, Bytes};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Frame {
-    String(String),
-    Error(String),
+    SimpleString(String),
+    SimpleError(String),
     Integer(usize),
     Null,
     Booleans(char),
-    Array(Vec<Frame>),
+    Array(VecDeque<Frame>),
     Bulk(Bytes),
 }
 
@@ -37,6 +37,15 @@ impl Frame {
 
                 Ok(())
             }
+            b'-' => {
+                //    This is a simple String
+                // Parse the contents
+
+                get_simple_string(cursor)?;
+
+                Ok(())
+            }
+            b'*' => check_array(cursor),
             _ => Err(FrameError::Other(String::from(
                 "Protocol Error: Invalid input ",
             ))),
@@ -50,14 +59,15 @@ impl Frame {
                 // Parse the contents
                 let bytes = get_simple_string(cursor)?;
                 let string = String::from_utf8_lossy(bytes).to_string();
-                Ok(Frame::String(string))
+
+                Ok(Frame::SimpleString(string))
             }
             b'-' => {
                 //    This is a simple Error
                 // Parse the contents
                 let bytes = get_simple_string(cursor)?;
                 let error = String::from_utf8_lossy(bytes).to_string();
-                Ok(Frame::Error(error))
+                Ok(Frame::SimpleError(error))
             }
             b':' => {
                 //    This is an Integer
@@ -66,6 +76,8 @@ impl Frame {
 
                 Ok(Frame::Integer(integer))
             }
+            b'*' => get_array(cursor),
+
             _ => Err(FrameError::Other(String::from(
                 "Protocol Error: Invalid input ",
             ))),
@@ -79,6 +91,35 @@ fn get_first_byte(cursor: &mut Cursor<&[u8]>) -> Result<u8, FrameError> {
     }
 
     Ok(cursor.get_u8())
+}
+
+fn check_array(cursor: &mut Cursor<&[u8]>) -> Result<(), FrameError> {
+    // First element is the number of items
+    // The rest are individual frames
+
+    let num_of_items = get_integer(cursor)?;
+
+    for _ in 0..num_of_items {
+        Frame::check(cursor)?;
+    }
+
+    Ok(())
+}
+
+fn get_array(cursor: &mut Cursor<&[u8]>) -> Result<Frame, FrameError> {
+    // First element is the number of items
+    // The rest are individual frames
+
+    let num_of_items = get_integer(cursor)?;
+
+    let mut frames = VecDeque::new();
+
+    for _ in 0..num_of_items {
+        let frame = Frame::parse(cursor)?;
+        frames.push_back(frame);
+    }
+
+    Ok(Frame::Array(frames))
 }
 
 fn get_integer(cursor: &mut Cursor<&[u8]>) -> Result<usize, FrameError> {
