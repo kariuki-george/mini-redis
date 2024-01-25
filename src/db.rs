@@ -8,7 +8,12 @@ pub struct Value {
     value: Vec<u8>,
     _expires_at: Option<Instant>,
 }
+/**
+* Key-Value database that stores the data.
+* It is protected via an arc that safe to pass across threads.
+* Implements a mutex to protect the data from multithread access.
 
+*/
 #[derive(Clone)]
 pub struct DB {
     pub db: Arc<Mutex<HashMap<String, Value>>>,
@@ -20,6 +25,7 @@ impl DB {
             db: Arc::new(Mutex::new(HashMap::new())),
         }
     }
+
     pub fn set(&mut self, key: String, value: Vec<u8>, ttl: Option<usize>) {
         let mut db = self.db.lock().unwrap();
 

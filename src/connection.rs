@@ -11,14 +11,25 @@ pub enum ConnectionError {
     FrameError(FrameError),
     IOError(ErrorKind),
 }
+
+/**
+ * Handles all tcp communications.
+ * It takes in a tcp stream and allocated buffer to read data from it.
+ * It reads data from the tcpstream buffer into it's buffer thus returning a frame if successful.
+ * It writes frames into the tcpstream and flushes it when done ensuring it reaches the client.
+ */
 pub struct Connection {
     stream: BufWriter<TcpStream>,
     buffer: BytesMut,
 }
 
 impl Connection {
+    /**
+     * Takes in a tcpstream to be used for reading and writing frames.
+     * Pre-allocates a buffer in this case 2KB. It can be adjusted according to stats.
+     * This allows us not to preallocate alot of buffer that ends up getting unused.
+     */
     pub fn new(stream: TcpStream) -> Connection {
-        // The buffer will store atmost 2 KBs.
         Connection {
             buffer: BytesMut::with_capacity(2 * 1024),
             stream: BufWriter::new(stream),
@@ -26,13 +37,9 @@ impl Connection {
     }
 
     /**
-     * As a result of a static buffer size,
-     * We might need to read the stream a couple times to read a full/valid frame.
-     * This results into several states
-     * 1. A frame is read from the buffer
-     * 2. Buffer is empty thus no frame
-     * 3. Frame requires more data than the buffer can handle thus another loop to read more data.
-     * 4. Stream is empty, buffer is empty, but a frame is incomplete thus connection reset error
+     * Tries to read a frame from the tcpStream.
+     * Returns a frame if one is found else None if no frame is in the stream.
+     *
      */
 
     pub async fn read_frame(&mut self) -> Result<Option<Frame>, ConnectionError> {
@@ -54,6 +61,7 @@ impl Connection {
                 if self.buffer.is_empty() {
                     return Ok(None);
                 } else {
+                    // The client possibly closed the connection or some networking issue occurred
                     return Err(ConnectionError::IOError(ErrorKind::ConnectionReset));
                 }
             }
@@ -63,11 +71,9 @@ impl Connection {
     /**
      * Use a cursor to read a frame from the stream.
      * A frame can be parsed from multiple buffers from the same stream, one after the other
-     *      *
      */
     fn parse_frame(&mut self) -> Result<Option<Frame>, FrameError> {
         let mut cursor: Cursor<&[u8]> = Cursor::new(&self.buffer[..]);
-
         match Frame::check(&mut cursor) {
             Ok(_) => {
                 let len = cursor.position();
@@ -85,7 +91,10 @@ impl Connection {
             },
         }
     }
-
+    /**
+     * Writes frames into the tcpstream thus responding to the client.
+     *
+     */
     pub async fn write_all(&mut self, frame: Frame) -> std::io::Result<()> {
         match frame {
             Frame::SimpleString(_) => {
@@ -94,9 +103,7 @@ impl Connection {
             Frame::SimpleError(_) => {
                 self.write(frame).await?;
             }
-            Frame::Integer(_) => {}
-            Frame::Null => {}
-            Frame::Booleans(_) => {}
+
             Frame::Array(frames) => {
                 self.stream.write_all('*'.to_string().as_bytes()).await?;
                 self.stream
@@ -107,7 +114,6 @@ impl Connection {
                     self.write(frame.to_owned()).await?;
                 }
             }
-            Frame::Bulk(_) => {}
         }
 
         self.stream.flush().await?;
@@ -133,10 +139,7 @@ impl Connection {
 
                 self.stream.write_all(data.as_bytes()).await?;
             }
-            Frame::Integer(_) => {}
-            Frame::Null => {}
-            Frame::Booleans(_) => {}
-            Frame::Bulk(_) => {}
+            // TODO: Handle these arms
             Frame::Array(_) => {}
         }
 

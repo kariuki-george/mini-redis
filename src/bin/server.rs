@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use mini_redis::{
     connection::{Connection, ConnectionError},
     db::DB,
@@ -12,19 +14,27 @@ async fn main() {
     let db = DB::new();
 
     loop {
+        /*
+        Block the main thread until a connection is created.
+        Clone the db for that connection to use.
+        Create a new tokio handle(green thread) to handle the connection
+         */
         let (stream, _) = listener.accept().await.unwrap();
-
         let mut db = db.clone();
 
         let handle = tokio::spawn(async move {
             let mut connection = Connection::new(stream);
 
-            // Read a frame to completion
+            // Get a full frame from the connection
+            // A frame in this case refers to a complete data unit in this case corresponds to the redis protocol spec
+            // Most frames are of either Array or String
+            // E.g [Frame::SimpleString("SET"),Frame::SimpleString("KEY"),Frame::SimpleString("VALUE")]
+            // E.g Frame::SimpleString("PING")
 
             let frame = match connection.read_frame().await {
                 Ok(frame) => match frame {
                     Some(frame) => frame,
-                    None => Frame::Null,
+                    None => Frame::Array(VecDeque::new()),
                 },
                 Err(err) => {
                     handle_err(err, &mut connection).await;
@@ -32,17 +42,20 @@ async fn main() {
                 }
             };
 
-            // Parse the frame and run the commands against the db
+            // Takes a frame from earlier step and executes it.
+            // Takes the db instance for frames that require db access.
 
             let mut runner = Runner::new(&mut db);
             let results = runner.run(frame);
 
-            // Return output to the user
+            // Parse the results from the runner
+            // If successful, write the resulting frame back to the client
             match results {
                 Err(err) => handle_runner_err(err, &mut connection).await,
                 Ok(frame) => connection.write_all(frame).await.unwrap(),
             }
 
+            // Shutdown the connection
             connection.shutdown().await;
         });
 

@@ -2,6 +2,10 @@ use std::collections::VecDeque;
 
 use crate::{db::DB, frame::Frame};
 
+/**
+ * Handles execution of a frame.
+ * It parses commands from a frame and executes them against the db if necessary
+ */
 pub struct Runner<'a> {
     db: &'a mut DB,
 }

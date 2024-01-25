@@ -1,16 +1,19 @@
 use std::{collections::VecDeque, io::Cursor};
 
-use bytes::{Buf, Bytes};
+use bytes::Buf;
+
+/*
+A redis string is parsed into a  valid frame
+Example ->
+    redis string input -> "*2\r\n$5\r\get\r\n$5\r\key\r\n:
+    Output ->  [String(get), String(key)]
+*/
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Frame {
     SimpleString(String),
     SimpleError(String),
-    Integer(usize),
-    Null,
-    Booleans(char),
     Array(VecDeque<Frame>),
-    Bulk(Bytes),
 }
 
 #[derive(Debug)]
@@ -20,13 +23,8 @@ pub enum FrameError {
 }
 
 impl Frame {
-    // A redis string is parsed into an array of valid frames
-    // Example -> An array *2\r\n$5\r\get\r\n$5\r\key\r\n
-    // Output ->  [String(get), String(key)]
-
     // Checks if a complete frame can be deserialized from a buffer.
     // Optimized to be fast thus not allocations.
-
     pub fn check(cursor: &mut Cursor<&[u8]>) -> Result<(), FrameError> {
         match get_first_byte(cursor)? {
             b'+' => {
@@ -52,6 +50,8 @@ impl Frame {
         }
     }
 
+    // Deserializes a frame from a buffer
+
     pub fn parse(cursor: &mut Cursor<&[u8]>) -> Result<Frame, FrameError> {
         match get_first_byte(cursor)? {
             b'+' => {
@@ -69,13 +69,7 @@ impl Frame {
                 let error = String::from_utf8_lossy(bytes).to_string();
                 Ok(Frame::SimpleError(error))
             }
-            b':' => {
-                //    This is an Integer
-                // Parse the contents
-                let integer = get_integer(cursor)?;
 
-                Ok(Frame::Integer(integer))
-            }
             b'*' => get_array(cursor),
 
             _ => Err(FrameError::Other(String::from(
