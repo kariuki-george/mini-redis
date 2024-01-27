@@ -62,3 +62,9 @@ impl DB {
         None
     }
 }
+
+impl Default for DB {
+    fn default() -> Self {
+        Self::new()
+    }
+}
