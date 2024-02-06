@@ -1,51 +1,73 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
+use tokio::sync::Notify;
+
+#[derive(Clone)]
 pub struct Value {
     value: Vec<u8>,
-    _expires_at: Option<Instant>,
+    expires_at: Option<Instant>,
 }
 /**
 * Key-Value database that stores the data.
 * It is protected via an arc that safe to pass across threads.
 * Implements a mutex to protect the data from multithread access.
-
+ Mutex is implemented on the db as ttls will be accessed from only one thread thus no race conditions are possible
 */
+
+pub struct Store {
+    pub entries: HashMap<String, Value>,
+    pub ttls: BTreeSet<(Instant, String)>,
+}
+
+pub struct Shared {
+    pub state: Mutex<Store>,
+    pub bg_task: Notify,
+}
+
 #[derive(Clone)]
 pub struct DB {
-    pub db: Arc<Mutex<HashMap<String, Value>>>,
+    pub db: Arc<Shared>,
 }
 
 impl DB {
     pub fn new() -> DB {
-        DB {
-            db: Arc::new(Mutex::new(HashMap::new())),
-        }
+        let shared = Shared {
+            bg_task: Notify::new(),
+            state: Mutex::new(Store {
+                entries: HashMap::new(),
+                ttls: BTreeSet::new(),
+            }),
+        };
+
+        let shared = Arc::new(shared);
+
+        tokio::spawn(delete_entries(shared.clone()));
+
+        DB { db: shared }
     }
 
     pub fn set(&mut self, key: String, value: Vec<u8>, ttl: Option<usize>) {
-        let mut db = self.db.lock().unwrap();
+        let mut store = self.db.state.lock().unwrap();
 
-        let mut expires_at = None;
-        if let Some(ttl) = ttl {
-            expires_at = Some(Instant::now() + Duration::from_millis(ttl as u64));
-        }
-        db.insert(
-            key,
-            Value {
-                value,
-                _expires_at: expires_at,
-            },
-        );
+        let expires_at = if let Some(ttl) = ttl {
+            let expires_at = Instant::now() + Duration::from_secs(ttl as u64);
+            store.ttls.insert((expires_at, key.clone()));
+            self.db.bg_task.notify_one();
+            Some(expires_at)
+        } else {
+            None
+        };
+        store.entries.insert(key, Value { value, expires_at });
     }
 
     pub fn get(&self, key: &str) -> Option<Vec<u8>> {
-        let db = self.db.lock().unwrap();
+        let store = self.db.state.lock().unwrap();
 
-        let value = db.get(key);
+        let value = store.entries.get(key);
         if let Some(value) = value {
             return Some(value.value.clone());
         }
@@ -53,9 +75,9 @@ impl DB {
     }
 
     pub fn delete(&mut self, key: &str) -> Option<Vec<u8>> {
-        let mut db = self.db.lock().unwrap();
+        let mut store = self.db.state.lock().unwrap();
 
-        let value = db.remove(key);
+        let value = store.entries.remove(key);
         if let Some(value) = value {
             return Some(value.value);
         }
@@ -68,3 +90,55 @@ impl Default for DB {
         Self::new()
     }
 }
+
+impl Shared {
+    fn delete_entries(&self) -> Option<Instant> {
+        let mut store = self.state.lock().unwrap();
+        let now = Instant::now();
+
+        let store = &mut *store;
+
+        while let Some(ttl) = store.ttls.iter().next().cloned() {
+            if ttl.0 > now {
+                return Some(ttl.0);
+            }
+
+            store.ttls.remove(&ttl);
+            store.entries.remove(&ttl.1);
+        }
+
+        None
+    }
+}
+
+async fn delete_entries(shared: Arc<Shared>) {
+    loop {
+        // Task should run after some ttl or if it get's notified.
+
+        match shared.delete_entries() {
+            Some(ttl) => {
+                tokio::select! {
+                    _ = tokio::time::sleep_until(tokio::time::Instant::from_std(ttl.to_owned())) => {}
+                    _ = shared.bg_task.notified() => {}
+                }
+            }
+            None => shared.bg_task.notified().await,
+        }
+    }
+}
+
+// #[cfg(test)]
+// mod tests {
+//     use std::time::Duration;
+
+//     use super::*;
+
+//     #[tokio::test]
+//     async fn check_db() {
+//         let mut db = DB::new();
+//         db.set("key".to_string(), "value".as_bytes().to_vec(), Some(2));
+//         db.set("key2".to_string(), "value".as_bytes().to_vec(), Some(10));
+
+//         tokio::time::sleep(Duration::from_secs(3)).await;
+//     }
+// }
