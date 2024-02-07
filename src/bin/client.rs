@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Duration};
 
 use mini_redis::{connection::Connection, frame::Frame};
 
@@ -7,6 +7,10 @@ use tokio::net::TcpStream;
 #[tokio::main]
 async fn main() {
     set().await;
+    get().await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    get().await;
+    tokio::time::sleep(Duration::from_secs(4)).await;
     get().await;
 }
 
@@ -21,6 +25,8 @@ async fn set() {
         Frame::SimpleString("set".to_string()),
         Frame::SimpleString("user".to_string()),
         Frame::SimpleString("kariuki".to_string()),
+        Frame::SimpleString("EX".to_string()),
+        Frame::Integer(5),
     ]);
 
     //  let input = String::from("ping");

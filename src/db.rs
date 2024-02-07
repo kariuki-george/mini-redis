@@ -127,18 +127,50 @@ async fn delete_entries(shared: Arc<Shared>) {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use std::time::Duration;
+#[cfg(test)]
+mod tests {
 
-//     use super::*;
+    use super::*;
 
-//     #[tokio::test]
-//     async fn check_db() {
-//         let mut db = DB::new();
-//         db.set("key".to_string(), "value".as_bytes().to_vec(), Some(2));
-//         db.set("key2".to_string(), "value".as_bytes().to_vec(), Some(10));
+    #[tokio::test]
+    async fn set_get() {
+        let mut db = DB::new();
+        let value = "value".as_bytes().to_vec();
+        db.set("key".to_string(), value.clone(), None);
 
-//         tokio::time::sleep(Duration::from_secs(3)).await;
-//     }
-// }
+        let result_value = db.get("key").unwrap();
+
+        assert_eq!(value, result_value);
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn get_nonexistent() {
+        let db = DB::new();
+
+        db.get("key").unwrap();
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn delete() {
+        let mut db = DB::new();
+        let value = "value".as_bytes().to_vec();
+        db.set("key".to_string(), value.clone(), None);
+
+        db.delete("key");
+
+        db.get("key").unwrap();
+    }
+
+    #[tokio::test]
+    #[should_panic]
+
+    async fn test_expiry() {
+        let mut db = DB::new();
+        let value = "value".as_bytes().to_vec();
+        db.set("key".to_string(), value.clone(), Some(2));
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        db.get("key").unwrap();
+    }
+}

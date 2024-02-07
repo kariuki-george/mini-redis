@@ -48,7 +48,7 @@ impl<'a> Runner<'a> {
         }
     }
     fn run_set(&mut self, frames: &mut VecDeque<Frame>) -> Result<Frame, RunnerError> {
-        if frames.len() > 2 {
+        if frames.len() < 2 {
             return Err(RunnerError::Incomplete);
         }
 
@@ -66,7 +66,36 @@ impl<'a> Runner<'a> {
             _ => return Err(RunnerError::Unsupported),
         };
 
-        self.db.set(key, value.as_bytes().to_owned(), None);
+        // Check if ttl options is in the next frame
+        // If available -  parse the value
+        // Ignore the next frame
+
+        let ttl = match frames.front() {
+            Some(frame) => {
+                if let Frame::SimpleString(input) = frame {
+                    match input.to_uppercase().as_str() {
+                        "EX" => {
+                            frames.pop_front();
+                            let ttl_frame = frames.pop_front().ok_or(RunnerError::Incomplete)?;
+                            match ttl_frame {
+                                Frame::Integer(ttl) => Some(ttl),
+                                _ => {
+                                    return Err(RunnerError::Other(
+                                        "Incorrect ttl data type. Should be an integer".to_string(),
+                                    ))
+                                }
+                            }
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            None => None,
+        };
+
+        self.db.set(key, value.as_bytes().to_owned(), ttl);
         Ok(Frame::SimpleString("OK".to_string()))
     }
 
