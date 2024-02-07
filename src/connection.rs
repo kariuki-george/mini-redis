@@ -103,6 +103,9 @@ impl Connection {
             Frame::SimpleError(_) => {
                 self.write(frame).await?;
             }
+            Frame::Integer(_) => {
+                self.write(frame).await?;
+            }
 
             Frame::Array(frames) => {
                 self.stream.write_all('*'.to_string().as_bytes()).await?;
@@ -127,6 +130,15 @@ impl Connection {
                 let mut data = String::new();
                 data.push('+');
                 data.push_str(input.as_str());
+                data.push_str("\r\n");
+
+                self.stream.write_all(data.as_bytes()).await?;
+            }
+            Frame::Integer(input) => {
+                // 🦥
+                let mut data = String::new();
+                data.push(':');
+                data.push_str(input.to_string().as_str());
                 data.push_str("\r\n");
 
                 self.stream.write_all(data.as_bytes()).await?;

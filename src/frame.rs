@@ -13,6 +13,7 @@ Example ->
 pub enum Frame {
     SimpleString(String),
     SimpleError(String),
+    Integer(usize),
     Array(VecDeque<Frame>),
 }
 
@@ -29,7 +30,6 @@ impl Frame {
         match get_first_byte(cursor)? {
             b'+' => {
                 //    This is a simple String
-                // Parse the contents
 
                 get_simple_string(cursor)?;
 
@@ -37,9 +37,15 @@ impl Frame {
             }
             b'-' => {
                 //    This is a simple String
-                // Parse the contents
 
                 get_simple_string(cursor)?;
+
+                Ok(())
+            }
+            b':' => {
+                //   Check an integer
+
+                get_integer(cursor)?;
 
                 Ok(())
             }
@@ -68,6 +74,13 @@ impl Frame {
                 let bytes = get_simple_string(cursor)?;
                 let error = String::from_utf8_lossy(bytes).to_string();
                 Ok(Frame::SimpleError(error))
+            }
+            b':' => {
+                //   Check an integer
+
+                let integer = get_integer(cursor)?;
+
+                Ok(Frame::Integer(integer))
             }
 
             b'*' => get_array(cursor),
