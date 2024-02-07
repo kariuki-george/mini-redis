@@ -48,10 +48,7 @@ impl<'a> Runner<'a> {
         }
     }
     fn run_set(&mut self, frames: &mut VecDeque<Frame>) -> Result<Frame, RunnerError> {
-        if frames.len() < 2 {
-            return Err(RunnerError::Incomplete);
-        }
-
+      
         let key = frames.pop_front().ok_or(RunnerError::Incomplete)?;
 
         let key = match key {
@@ -100,9 +97,7 @@ impl<'a> Runner<'a> {
     }
 
     fn run_get(&mut self, frames: &mut VecDeque<Frame>) -> Result<Frame, RunnerError> {
-        if frames.len() < 1 {
-            return Err(RunnerError::Incomplete);
-        }
+       
 
         let key = frames.pop_front().ok_or(RunnerError::Incomplete)?;
 
