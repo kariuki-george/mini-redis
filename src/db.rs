@@ -8,8 +8,8 @@ use tokio::sync::Notify;
 
 #[derive(Clone)]
 pub struct Value {
-    value: Vec<u8>,
-    expires_at: Option<Instant>,
+    pub value: Vec<u8>,
+    pub expires_at: Option<Instant>,
 }
 /**
 * Key-Value database that stores the data.

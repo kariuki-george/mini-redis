@@ -4,14 +4,21 @@ use mini_redis::{
     connection::{Connection, ConnectionError},
     db::DB,
     frame::{Frame, FrameError},
+    rdb::RDB,
     runner::{Runner, RunnerError},
 };
 use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() {
-    let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
+    // Start db
     let db = DB::new();
+    // Start rdb instance
+    let rdb = RDB::new(db.clone());
+    // Load entries into db
+    rdb.load().await;
+    // Open TCP listener for new connections
+    let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
     loop {
         /*
