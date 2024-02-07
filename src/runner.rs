@@ -100,7 +100,7 @@ impl<'a> Runner<'a> {
     }
 
     fn run_get(&mut self, frames: &mut VecDeque<Frame>) -> Result<Frame, RunnerError> {
-        if frames.len() > 1 {
+        if frames.len() < 1 {
             return Err(RunnerError::Incomplete);
         }
 
