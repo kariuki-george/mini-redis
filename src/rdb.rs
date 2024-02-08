@@ -222,14 +222,6 @@ impl RDB {
     fn read_integer_encoded(&self, cursor: &mut Cursor<&Vec<u8>>) -> std::io::Result<usize> {
         let byte = self.get_next_byte(cursor)?;
 
-        // 01
-        // let input = input as u16;
-
-        // let byte_one = 0b0100_0000 | ((input >> 8) & 0b0011_1111) as u8;
-        // let byte_two = input as u8;
-
-        // writer.write_all(&[byte_one, byte_two]).unwrap();
-
         let significant_bits = (byte >> 6) & 0b11;
 
         if significant_bits == 0b00 {
@@ -331,7 +323,6 @@ async fn handle_saving(rdb: RDB) {
     };
 
     loop {
-        // Will save every 30 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(flush_every as u64)).await;
         rdb.save()
     }
