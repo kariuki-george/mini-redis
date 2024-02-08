@@ -75,7 +75,13 @@ impl<'a> Runner<'a> {
                             frames.pop_front();
                             let ttl_frame = frames.pop_front().ok_or(RunnerError::Incomplete)?;
                             match ttl_frame {
-                                Frame::Integer(ttl) => Some(ttl),
+                                Frame::Integer(ttl) => {
+                                    if ttl > 2_147_483_647 {
+                                        None
+                                    } else {
+                                        Some(ttl as u32)
+                                    }
+                                }
                                 _ => {
                                     return Err(RunnerError::Other(
                                         "Incorrect ttl data type. Should be an integer".to_string(),

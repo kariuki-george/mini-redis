@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeSet, HashMap},
     sync::{Arc, Mutex},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use tokio::sync::Notify;
@@ -9,7 +9,7 @@ use tokio::sync::Notify;
 #[derive(Clone)]
 pub struct Value {
     pub value: Vec<u8>,
-    pub expires_at: Option<Instant>,
+    pub expires_at: Option<u32>,
 }
 /**
 * Key-Value database that stores the data.
@@ -20,7 +20,7 @@ pub struct Value {
 
 pub struct Store {
     pub entries: HashMap<String, Value>,
-    pub ttls: BTreeSet<(Instant, String)>,
+    pub ttls: BTreeSet<(u32, String)>,
 }
 
 pub struct Shared {
@@ -35,6 +35,7 @@ pub struct DB {
 
 impl DB {
     pub fn new() -> DB {
+        tracing::info!("DB: Starting database service");
         let shared = Shared {
             bg_task: Notify::new(),
             state: Mutex::new(Store {
@@ -50,13 +51,14 @@ impl DB {
         DB { db: shared }
     }
 
-    pub fn set(&mut self, key: String, value: Vec<u8>, ttl: Option<usize>) {
+    pub fn set(&mut self, key: String, value: Vec<u8>, ttl: Option<u32>) {
         let mut store = self.db.state.lock().unwrap();
 
         let expires_at = if let Some(ttl) = ttl {
-            let expires_at = Instant::now() + Duration::from_secs(ttl as u64);
+            let expires_at = chrono::Utc::now().timestamp() as u32 + ttl;
             store.ttls.insert((expires_at, key.clone()));
             self.db.bg_task.notify_one();
+
             Some(expires_at)
         } else {
             None
@@ -92,9 +94,9 @@ impl Default for DB {
 }
 
 impl Shared {
-    fn delete_entries(&self) -> Option<Instant> {
+    fn delete_entries(&self) -> Option<u32> {
         let mut store = self.state.lock().unwrap();
-        let now = Instant::now();
+        let now = chrono::Utc::now().timestamp() as u32;
 
         let store = &mut *store;
 
@@ -112,13 +114,14 @@ impl Shared {
 }
 
 async fn delete_entries(shared: Arc<Shared>) {
+    tracing::info!("DB: Starting db background worker");
     loop {
         // Task should run after some ttl or if it get's notified.
 
         match shared.delete_entries() {
             Some(ttl) => {
                 tokio::select! {
-                    _ = tokio::time::sleep_until(tokio::time::Instant::from_std(ttl.to_owned())) => {}
+                    _ = tokio::time::sleep(Duration::from_secs((ttl-chrono::Utc::now().timestamp() as u32 ) as u64)) => {}
                     _ = shared.bg_task.notified() => {}
                 }
             }

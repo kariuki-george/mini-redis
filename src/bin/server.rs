@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, ops::Sub};
 
 use mini_redis::{
     connection::{Connection, ConnectionError},
@@ -11,14 +11,35 @@ use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().expect("Failed to read .env file");
+
+    let subscriber = tracing_subscriber::fmt()
+        .compact()
+        // Display source code file paths
+        .with_file(true)
+        // Display source code line numbers
+        .with_line_number(true)
+        // Display the thread ID an event was recorded on
+        .with_thread_ids(true)
+        // Don't display the event's target (module path)
+        .with_target(false)
+        // Build the subscriber
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
+    tracing::info!("MINIREDIS: Starting mini-redis");
     // Start db
     let db = DB::new();
     // Start rdb instance
-    let rdb = RDB::new(db.clone());
-    // Load entries into db
-    rdb.load().await;
+    let mut rdb = RDB::new(db.clone());
+
+    // Load saved entries into db
+    rdb.load().await.unwrap();
+
     // Open TCP listener for new connections
-    let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
+    let addr = std::env::var("ADDR").expect("ADDR env var not provided");
+    let listener = TcpListener::bind(addr.clone()).await.unwrap();
+    tracing::info!("MINIREDIS: Listening for connections at {}", addr);
 
     loop {
         /*
@@ -27,6 +48,7 @@ async fn main() {
         Create a new tokio handle(green thread) to handle the connection
          */
         let (stream, _) = listener.accept().await.unwrap();
+        let start = chrono::Utc::now();
         let mut db = db.clone();
 
         let handle = tokio::spawn(async move {
@@ -61,9 +83,12 @@ async fn main() {
                 Err(err) => handle_runner_err(err, &mut connection).await,
                 Ok(frame) => connection.write_all(frame).await.unwrap(),
             }
+            let stop = chrono::Utc::now();
 
             // Shutdown the connection
             connection.shutdown().await;
+            let total_time = stop.sub(start).to_std().unwrap().as_nanos();
+            tracing::info!("MINIREDIS: Handled request for {} ns", total_time)
         });
 
         handle.await.unwrap();
