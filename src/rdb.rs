@@ -52,7 +52,7 @@ impl RDB {
         // Size of entries
         self.write_integer_encoded(&mut writer, store.entries.len());
         // Size of ttls
-        self.write_integer_encoded(&mut writer, 7000);
+        self.write_integer_encoded(&mut writer, store.ttls.len());
 
         // Key value pairs
         // Map through all entries
