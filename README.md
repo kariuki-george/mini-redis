@@ -83,5 +83,5 @@ Note: More client examples coming soon⌛
 6. SERVER TO HANDLE CONCURRENT CLIENTS ✅
 7. IMPLEMENT SET, GET ✅
 8. ADD DATA PERSISTENCE -> USE RDB ✅ OR AOF -> https://redis.io/docs/management/persistence/
-9. SUPPORT CONFIG GET FOR THE RDB STUFF ⚒️
+9. SUPPORT CONFIG GET FOR THE RDB STUFF ✅
 10. EXPIRY -> TTL ✅
