@@ -23,23 +23,23 @@ Persistence is available through [RDB](https://redis.io/docs/management/persiste
 
 ### TCP Server and client
 
-the server and client bins use tcp and RESP to communicate with each other.
+The server and client bins use tcp and RESP to communicate with each other.\
 TCP functionality is provided by tokio.
 Server gracefully handles runtime errors.
 
 ### DATABASE
 
-A hashmap is used as the KV database.
+A hashmap is used as the KV database.\
 key - string representing the key.
-value - a struct with two fields -> value represented in bytes to minimize serialization and deserialization, and expires_at a u32 representing when the KV should be evicted.
-A u32 is used as it is the range that Redis uses for their ttls.
-It uses a background worker to evict expired KV.
-It uses a BTreeSet to sort the ttls for deletion by the background worker.
+value - a struct with two fields -> value represented in bytes to minimize serialization and deserialization, and expires_at a u32 representing when the KV should be evicted.\
+A u32 is used as it is the range that Redis uses for their ttls.\
+It uses a background worker to evict expired KV.\
+It uses a BTreeSet to sort the ttls for deletion by the background worker.\
 The database uses a mutex to prevent race conditions across threads and Arc pointer for safe sharing across threads.
 
 ### RDB
 
-This crate/lib handles flushing and loading the db to and fro an rdb file.
+This crate/lib handles flushing and loading the db to and fro an rdb file.\
 It uses a background worker to do the job.
 
 ### Connection - crate
@@ -48,7 +48,7 @@ This crate handles reading and writing into the tcp stream following RESP and is
 
 ### Frame - crate
 
-This is responsible for reading meaningful data/ frames from raw bytes sent from a tcp stream.
+This is responsible for reading meaningful data/ frames from raw bytes sent from a tcp stream.\
 Example: get key is read into
 
 ```
@@ -82,6 +82,6 @@ Note: More client examples coming soon⌛
 5. READ MULTIPLE STRING IN THE SAME REQUEST -> SET KEY VALUE ✅
 6. SERVER TO HANDLE CONCURRENT CLIENTS ✅
 7. IMPLEMENT SET, GET ✅
-8. ADD DATA PERSISTENCE -> USE RDB ✅ OR AOF -> https://redis.io/docs/management/persistence/ 
+8. ADD DATA PERSISTENCE -> USE RDB ✅ OR AOF -> https://redis.io/docs/management/persistence/
 9. SUPPORT CONFIG GET FOR THE RDB STUFF ⚒️
 10. EXPIRY -> TTL ✅
